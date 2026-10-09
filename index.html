@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apify Comment Dataset Viewer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col antialiased">
+
+    <!-- Header Navbar -->
+    <header class="sticky top-0 z-30 glass-panel border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid me-0 fa-comments text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white leading-tight flex items-center gap-2">
+                        Dataset Viewer
+                        <span class="text-xs font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">Apify API</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Penganalisis & Visualisasi Data Komentar</p>
+                </div>
+            </div>
+
+            <!-- Actions Right Header -->
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <button id="btnFetch" onclick="fetchApifyData()" class="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-95">
+                    <i id="fetchIcon" class="fa-solid fa-arrows-rotate"></i>
+                    <span class="hidden sm:inline">Muat Ulang</span> Data
+                </button>
+                <div class="relative group">
+                    <button class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs sm:text-sm border border-slate-700 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-download"></i>
+                        <span class="hidden sm:inline">Ekspor</span>
+                        <i class="fa-solid fa-chevron-down text-xs ml-1"></i>
+                    </button>
+                    <div class="absolute right-0 mt-1 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 hidden group-hover:block z-50">
+                        <button onclick="exportData('csv')" class="w-full px-4 py-2 text-left text-xs text-slate-300 hover:bg-slate-700 flex items-center gap-2">
+                            <i class="fa-solid fa-file-csv text-emerald-400"></i> Unduh CSV
+                        </button>
+                        <button onclick="exportData('json')" class="w-full px-4 py-2 text-left text-xs text-slate-300 hover:bg-slate-700 flex items-center gap-2">
+                            <i class="fa-solid fa-file-code text-amber-400"></i> Unduh JSON
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Endpoint Info & Status Banner -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="flex items-start gap-3 min-w-0">
+                    <div class="p-2.5 rounded-lg bg-slate-800 text-indigo-400 mt-0.5">
+                        <i class="fa-solid fa-link text-sm"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Sumber Endpoint API</p>
+                        <p id="endpointUrlDisplay" class="text-xs sm:text-sm font-mono text-slate-300 truncate mt-0.5 select-all hover:text-indigo-300 transition cursor-pointer">
+                            https://api.apify.com/v2/datasets/FqRYvXklarYuTRRjR/items?signature=MC4xNzkyNzE4MDcwODg5LjFGQURpS0hldlRHWnZVeko3SEo1MA&format=json&clean=true
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 border-t md:border-t-0 border-slate-800 pt-3 md:pt-0">
+                    <div class="flex items-center gap-2 text-xs">
+                        <span id="statusIndicator" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                        <span id="statusText" class="text-slate-400">Menghubungkan...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Cards Overview -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Total Komentar -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between hover:border-slate-700 transition">
+                <div>
+                    <p class="text-xs font-medium text-slate-400">Total Komentar</p>
+                    <h3 id="statTotal" class="text-2xl font-bold text-white mt-1">--</h3>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+                    <i class="fa-solid fa-comments text-lg"></i>
+                </div>
+            </div>
+
+            <!-- Unique Users -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between hover:border-slate-700 transition">
+                <div>
+                    <p class="text-xs font-medium text-slate-400">Pengguna Unik</p>
+                    <h3 id="statUsers" class="text-2xl font-bold text-white mt-1">--</h3>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                    <i class="fa-solid fa-users text-lg"></i>
+                </div>
+            </div>
+
+            <!-- Total Likes/Interaksi -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between hover:border-slate-700 transition">
+                <div>
+                    <p class="text-xs font-medium text-slate-400">Total Likes / Suka</p>
+                    <h3 id="statLikes" class="text-2xl font-bold text-white mt-1">--</h3>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
+                    <i class="fa-solid fa-heart text-lg"></i>
+                </div>
+            </div>
+
+            <!-- Comment Ratio/Top User -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between hover:border-slate-700 transition">
+                <div class="truncate mr-2">
+                    <p class="text-xs font-medium text-slate-400">Komentator Teraktif</p>
+                    <h3 id="statTopUser" class="text-lg font-bold text-white mt-1 truncate">--</h3>
+                </div>
+                <div class="w-10 h-10 shrink-0 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                    <i class="fa-solid fa-crown text-lg"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls & Filter Toolbar -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+            <!-- Search input -->
+            <div class="relative flex-1">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input id="searchInput" type="text" placeholder="Cari teks komentar, nama pengguna, atau kata kunci..." 
+                       oninput="handleSearch()"
+                       class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
+            </div>
+
+            <!-- Filters and Sorting Options -->
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                <!-- Sorting Dropdown -->
+                <div class="flex items-center gap-2">
+                    <label class="text-xs text-slate-400 hidden sm:inline">Urutkan:</label>
+                    <select id="sortBy" onchange="handleFilterSort()" class="bg-slate-950 border border-slate-800 text-xs sm:text-sm text-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500">
+                        <option value="default">Default API</option>
+                        <option value="newest">Terbaru (Tanggal)</option>
+                        <option value="oldest">Terlama (Tanggal)</option>
+                        <option value="likes-desc">Likes Terbanyak</option>
+                        <option value="user-asc">Nama Pengguna (A-Z)</option>
+                    </select>
+                </div>
+
+                <!-- View Switcher (Grid / Table / JSON) -->
+                <div class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800">
+                    <button onclick="setViewMode('grid')" id="viewBtnGrid" title="Tampilan Kartu" class="p-1.5 px-2.5 rounded text-xs font-medium transition text-indigo-400 bg-slate-800">
+                        <i class="fa-solid fa-grip-vertical"></i>
+                    </button>
+                    <button onclick="setViewMode('table')" id="viewBtnTable" title="Tampilan Tabel" class="p-1.5 px-2.5 rounded text-xs font-medium transition text-slate-400 hover:text-slate-200">
+                        <i class="fa-solid fa-table-list"></i>
+                    </button>
+                    <button onclick="setViewMode('json')" id="viewBtnJson" title="Tampilan JSON Raw" class="p-1.5 px-2.5 rounded text-xs font-medium transition text-slate-400 hover:text-slate-200">
+                        <i class="fa-solid fa-code"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div id="contentContainer" class="min-h-[350px]">
+            <!-- Loading Skeleton State -->
+            <div id="loadingState" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 animate-pulse space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-slate-800"></div>
+                        <div class="space-y-1.5 flex-1">
+                            <div class="h-3.5 bg-slate-800 rounded w-1/2"></div>
+                            <div class="h-2.5 bg-slate-800 rounded w-1/3"></div>
+                        </div>
+                    </div>
+                    <div class="h-12 bg-slate-800/60 rounded"></div>
+                    <div class="h-3 bg-slate-800 rounded w-1/4"></div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 animate-pulse space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-slate-800"></div>
+                        <div class="space-y-1.5 flex-1">
+                            <div class="h-3.5 bg-slate-800 rounded w-1/2"></div>
+                            <div class="h-2.5 bg-slate-800 rounded w-1/3"></div>
+                        </div>
+                    </div>
+                    <div class="h-12 bg-slate-800/60 rounded"></div>
+                    <div class="h-3 bg-slate-800 rounded w-1/4"></div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 animate-pulse space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-slate-800"></div>
+                        <div class="space-y-1.5 flex-1">
+                            <div class="h-3.5 bg-slate-800 rounded w-1/2"></div>
+                            <div class="h-2.5 bg-slate-800 rounded w-1/3"></div>
+                        </div>
+                    </div>
+                    <div class="h-12 bg-slate-800/60 rounded"></div>
+                    <div class="h-3 bg-slate-800 rounded w-1/4"></div>
+                </div>
+            </div>
+
+            <!-- Grid View Container -->
+            <div id="gridView" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+            <!-- Table View Container -->
+            <div id="tableView" class="hidden bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto shadow">
+                <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                        <tr class="bg-slate-950/80 border-b border-slate-800 text-slate-400 uppercase text-[11px] tracking-wider">
+                            <th class="p-3.5 pl-4">Pengguna</th>
+                            <th class="p-3.5">Komentar</th>
+                            <th class="p-3.5 whitespace-nowrap">Suka / Engagement</th>
+                            <th class="p-3.5 whitespace-nowrap">Waktu</th>
+                            <th class="p-3.5 text-right pr-4">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-800/60 text-slate-300"></tbody>
+                </table>
+            </div>
+
+            <!-- Raw JSON View Container -->
+            <div id="jsonView" class="hidden bg-slate-900 border border-slate-800 rounded-xl p-4 overflow-x-auto">
+                <pre id="jsonContent" class="text-xs font-mono text-emerald-400 leading-relaxed max-h-[600px] overflow-y-auto"></pre>
+            </div>
+
+            <!-- Empty State / Error State -->
+            <div id="emptyState" class="hidden bg-slate-900 border border-slate-800 rounded-xl p-12 text-center my-4">
+                <div class="w-16 h-16 bg-slate-800 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-comment-slash text-2xl"></i>
+                </div>
+                <h3 id="emptyTitle" class="text-base font-semibold text-slate-200">Tidak ada komentar ditemukan</h3>
+                <p id="emptySubtitle" class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Coba sesuaikan kata kunci pencarian atau bersihkan filter Anda.</p>
+                <button id="emptyActionBtn" onclick="resetFilters()" class="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg transition">
+                    Reset Filter Search
+                </button>
+            </div>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div id="paginationBar" class="hidden bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div class="text-slate-400">
+                Menampilkan <span id="pageStart" class="font-semibold text-slate-200">0</span> - <span id="pageEnd" class="font-semibold text-slate-200">0</span> dari <span id="totalItems" class="font-semibold text-slate-200">0</span> data
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1.5 mr-2">
+                    <span class="text-slate-400">Per halaman:</span>
+                    <select id="itemsPerPage" onchange="handleItemsPerPageChange()" class="bg-slate-950 border border-slate-800 text-slate-300 rounded px-2 py-1 focus:outline-none">
+                        <option value="12">12</option>
+                        <option value="24">24</option>
+                        <option value="48">48</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+
+                <button id="btnPrevPage" onclick="changePage(-1)" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 transition flex items-center gap-1">
+                    <i class="fa-solid fa-chevron-left text-[10px]"></i> Sblm
+                </button>
+                <span id="pageIndicator" class="px-3 py-1.5 rounded bg-slate-950 border border-slate-800 text-slate-300 font-medium">
+                    1 / 1
+                </span>
+                <button id="btnNextPage" onclick="changePage(1)" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 transition flex items-center gap-1">
+                    Lanjut <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Detail Comment Modal -->
+    <div id="detailModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <!-- Modal Header -->
+            <div class="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+                        <i class="fa-solid fa-circle-info"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-100 text-base">Rincian Komentar</h3>
+                        <p class="text-xs text-slate-400">Detail properti & meta data item dataset</p>
+                    </div>
+                </div>
+                <button onclick="closeDetailModal()" class="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-5 overflow-y-auto space-y-4 flex-1">
+                <!-- User Profile Info -->
+                <div class="flex items-center gap-3 p-3.5 bg-slate-950 rounded-xl border border-slate-800">
+                    <div id="modalAvatar" class="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-white text-lg shrink-0 overflow-hidden">
+                        U
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div id="modalAuthor" class="font-bold text-slate-200 text-sm truncate">Username</div>
+                        <div id="modalDate" class="text-xs text-slate-400 mt-0.5">Tanggal tidak diketahui</div>
+                    </div>
+                    <div id="modalLikesBadge" class="px-3 py-1 rounded-full bg-rose-500/10 text-rose-400 text-xs font-semibold border border-rose-500/20 flex items-center gap-1.5">
+                        <i class="fa-solid fa-heart"></i> <span id="modalLikesCount">0</span>
+                    </div>
+                </div>
+
+                <!-- Comment Content -->
+                <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1">Teks Komentar Utama</label>
+                    <div id="modalCommentBody" class="p-4 bg-slate-950 rounded-xl border border-slate-800 text-sm text-slate-200 leading-relaxed font-sans whitespace-pre-line">
+                        -
+                    </div>
+                </div>
+
+                <!-- Raw Metadata Collapsible/Tree -->
+                <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1">Objek JSON Lengkap</label>
+                    <div class="bg-slate-950 rounded-xl border border-slate-800 p-3 max-h-60 overflow-y-auto">
+                        <pre id="modalRawJson" class="text-xs font-mono text-slate-300 whitespace-pre-wrap"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 border-t border-slate-800 bg-slate-950/50 flex items-center justify-between">
+                <button onclick="copyModalJson()" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition flex items-center gap-2">
+                    <i class="fa-solid fa-copy"></i> Salin JSON Item
+                </button>
+                <button onclick="closeDetailModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Message Container -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="bg-slate-800 border border-slate-700 text-slate-200 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+            <div id="toastIcon" class="text-indigo-400">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <p id="toastMessage" class="text-xs font-medium">Pesan pemberitahuan</p>
+        </div>
+    </div>
+
+    <script>
+        // Target API Endpoint URL requested by user
+        const API_ENDPOINT = "https://api.apify.com/v2/datasets/FqRYvXklarYuTRRjR/items?signature=MC4xNzkyNzE4MDcwODg5LjFGQURpS0hldlRHWnZVeko3SEo1MA&format=json&clean=true";
+
+        // Application State
+        let rawDataset = [];
+        let processedComments = [];
+        let filteredComments = [];
+        let currentPage = 1;
+        let itemsPerPage = 12;
+        let currentViewMode = 'grid'; // 'grid', 'table', 'json'
+        let selectedItemForModal = null;
+
+        // Init App on Window Load
+        window.onload = function() {
+            fetchApifyData();
+        };
+
+        /**
+         * Fetch Dataset from Apify API Endpoint
+         */
+        async function fetchApifyData() {
+            const fetchBtn = document.getElementById('btnFetch');
+            const fetchIcon = document.getElementById('fetchIcon');
+            const statusIndicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            const loadingState = document.getElementById('loadingState');
+            const gridView = document.getElementById('gridView');
+            const tableView = document.getElementById('tableView');
+            const jsonView = document.getElementById('jsonView');
+            const emptyState = document.getElementById('emptyState');
+            const paginationBar = document.getElementById('paginationBar');
+
+            // UI Loading state reset
+            fetchIcon.classList.add('fa-spin');
+            statusIndicator.className = 'w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse';
+            statusText.textContent = 'Memuat data...';
+
+            loadingState.classList.remove('hidden');
+            gridView.classList.add('hidden');
+            tableView.classList.add('hidden');
+            jsonView.classList.add('hidden');
+            emptyState.classList.add('hidden');
+            paginationBar.classList.add('hidden');
+
+            try {
+                // Fetch directly from Apify endpoint
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP Error Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (!Array.isArray(data)) {
+                    // In case dataset item is wrapped in an object
+                    rawDataset = data.items || [data];
+                } else {
+                    rawDataset = data;
+                }
+
+                // Process & Normalise flexible dataset fields
+                processedComments = rawDataset.map((item, index) => normalizeCommentItem(item, index));
+
+                statusIndicator.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+                statusText.textContent = `Selesai (${processedComments.length} item)`;
+                showToast(`Berhasil memuat ${processedComments.length} komentar dari Apify!`, 'success');
+
+                // Update Metrics & Render
+                updateMetrics();
+                applyFilterAndSort();
+
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                
+                statusIndicator.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+                statusText.textContent = 'Gagal memuat API';
+
+                // Render Error / Fallback State
+                loadingState.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                document.getElementById('emptyTitle').textContent = 'Gagal Mengambil Data API';
+                document.getElementById('emptySubtitle').textContent = `Terjadi kendala CORS atau koneksi (${error.message}). Anda bisa mencoba memuat ulang atau menggunakan data contoh.`;
+                document.getElementById('emptyActionBtn').setAttribute('onclick', 'loadFallbackMockData()');
+                document.getElementById('emptyActionBtn').textContent = 'Muat Data Contoh Demo';
+
+                showToast('Gagal terhubung ke API: ' + error.message, 'error');
+            } finally {
+                fetchIcon.classList.remove('fa-spin');
+            }
+        }
+
+        /**
+         * Normalizes fields from different social media scrapers (TikTok, IG, YT, FB, etc.)
+         */
+        function normalizeCommentItem(item, id) {
+            // Flexible keys fallback sequence
+            const authorName = item.ownerUsername || item.username || item.author || item.user || item.owner?.username || item.authorName || item.nickname || item.name || "Anonim";
+            const commentText = item.text || item.comment || item.content || item.commentText || item.body || item.message || JSON.stringify(item);
+            const likesCount = item.likesCount || item.likes || item.diggCount || item.likeCount || item.likes_count || 0;
+            const createdAt = item.createdAt || item.timestamp || item.createdTime || item.date || item.publishedAt || item.time || null;
+            const avatarUrl = item.profilePic || item.avatar || item.userAvatar || item.owner?.profilePic || null;
+            const postUrl = item.url || item.postUrl || item.commentUrl || null;
+
+            return {
+                id: id,
+                author: authorName,
+                text: commentText,
+                likes: typeof likesCount === 'number' ? likesCount : (parseInt(likesCount) || 0),
+                date: createdAt ? formatDate(createdAt) : 'Tidak ada tanggal',
+                rawDate: createdAt ? new Date(createdAt).getTime() : 0,
+                avatar: avatarUrl,
+                postUrl: postUrl,
+                original: item
+            };
+        }
+
+        /**
+         * Fallback Mock Data Generator (Used if API CORS blocks browser direct access)
+         */
+        function loadFallbackMockData() {
+            const mockData = [
+                { username: "budi_santoso", text: "Wah kontennya sangat informatif dan bermanfaat sekali gan! Lanjutkan kerjanya.", likesCount: 42, createdAt: "2026-10-08T10:15:00Z" },
+                { username: "tech_guru", text: "Apify scraper memang sangat powerful untuk riset data media sosial secara otomatis.", likesCount: 128, createdAt: "2026-10-08T11:20:00Z" },
+                { username: "siti_rahma", text: "Apakah ada tutorial cara ekstrak dataset ini ke format Excel secara cepat?", likesCount: 5, createdAt: "2026-10-07T14:02:00Z" },
+                { username: "dev_indo", text: "Mantap mas, tampilan UI dasbornya bersih dan responsive banget!", likesCount: 89, createdAt: "2026-10-09T08:00:00Z" },
+                { username: "andi_kurnia", text: "Terima kasih informasinya sangat membantu pekerjaan analisa data harian.", likesCount: 19, createdAt: "2026-10-06T09:30:00Z" },
+                { username: "cyber_analyst", text: "Filter & search kinerjanya sangat cepat. Good job!", likesCount: 34, createdAt: "2026-10-05T16:45:00Z" }
+            ];
+
+            rawDataset = mockData;
+            processedComments = mockData.map((item, index) => normalizeCommentItem(item, index));
+            
+            document.getElementById('statusIndicator').className = 'w-2.5 h-2.5 rounded-full bg-indigo-500';
+            document.getElementById('statusText').textContent = 'Mode Demo Fallback';
+            
+            updateMetrics();
+            applyFilterAndSort();
+            showToast('Berhasil memuat data sampel demo!', 'info');
+        }
+
+        /**
+         * Calculate and update high-level metrics
+         */
+        function updateMetrics() {
+            // Total comments
+            document.getElementById('statTotal').textContent = processedComments.length.toLocaleString('id-ID');
+
+            // Unique Users
+            const uniqueUsers = new Set(processedComments.map(c => c.author.toLowerCase()));
+            document.getElementById('statUsers').textContent = uniqueUsers.size.toLocaleString('id-ID');
+
+            // Total Likes
+            const totalLikes = processedComments.reduce((acc, c) => acc + (c.likes || 0), 0);
+            document.getElementById('statLikes').textContent = totalLikes.toLocaleString('id-ID');
+
+            // Top User
+            if (processedComments.length > 0) {
+                const userCounts = {};
+                processedComments.forEach(c => {
+                    userCounts[c.author] = (userCounts[c.author] || 0) + 1;
+                });
+                const topUser = Object.keys(userCounts).reduce((a, b) => userCounts[a] > userCounts[b] ? a : b);
+                document.getElementById('statTopUser').textContent = topUser ? `@${topUser}` : '-';
+            } else {
+                document.getElementById('statTopUser').textContent = '-';
+            }
+        }
+
+        /**
+         * Handle Search Input Changes
+         */
+        function handleSearch() {
+            currentPage = 1;
+            applyFilterAndSort();
+        }
+
+        /**
+         * Handle Sorting Changes
+         */
+        function handleFilterSort() {
+            currentPage = 1;
+            applyFilterAndSort();
+        }
+
+        /**
+         * Apply Filter and Sort Rules
+         */
+        function applyFilterAndSort() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            const sortBy = document.getElementById('sortBy').value;
+
+            // Search filter
+            filteredComments = processedComments.filter(item => {
+                const matchText = item.text.toLowerCase().includes(query);
+                const matchAuthor = item.author.toLowerCase().includes(query);
+                return matchText || matchAuthor;
+            });
+
+            // Sorting logic
+            if (sortBy === 'newest') {
+                filteredComments.sort((a, b) => b.rawDate - a.rawDate);
+            } else if (sortBy === 'oldest') {
+                filteredComments.sort((a, b) => a.rawDate - b.rawDate);
+            } else if (sortBy === 'likes-desc') {
+                filteredComments.sort((a, b) => b.likes - a.likes);
+            } else if (sortBy === 'user-asc') {
+                filteredComments.sort((a, b) => a.author.localeCompare(b.author));
+            }
+
+            renderCurrentView();
+        }
+
+        /**
+         * Render active view mode
+         */
+        function renderCurrentView() {
+            const loadingState = document.getElementById('loadingState');
+            const gridView = document.getElementById('gridView');
+            const tableView = document.getElementById('tableView');
+            const jsonView = document.getElementById('jsonView');
+            const emptyState = document.getElementById('emptyState');
+            const paginationBar = document.getElementById('paginationBar');
+
+            loadingState.classList.add('hidden');
+
+            if (filteredComments.length === 0) {
+                gridView.classList.add('hidden');
+                tableView.classList.add('hidden');
+                jsonView.classList.add('hidden');
+                paginationBar.classList.add('hidden');
+
+                emptyState.classList.remove('hidden');
+                document.getElementById('emptyTitle').textContent = 'Komentar tidak ditemukan';
+                document.getElementById('emptySubtitle').textContent = 'Coba gunakan kata kunci pencarian yang berbeda.';
+                document.getElementById('emptyActionBtn').setAttribute('onclick', 'resetFilters()');
+                document.getElementById('emptyActionBtn').textContent = 'Reset Filter Pencarian';
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            // Pagination Calculations
+            const totalItems = filteredComments.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+            const pageItems = filteredComments.slice(startIndex, endIndex);
+
+            // Update Pagination UI
+            document.getElementById('pageStart').textContent = totalItems === 0 ? 0 : startIndex + 1;
+            document.getElementById('pageEnd').textContent = endIndex;
+            document.getElementById('totalItems').textContent = totalItems;
+            document.getElementById('pageIndicator').textContent = `${currentPage} / ${totalPages}`;
+            document.getElementById('btnPrevPage').disabled = currentPage === 1;
+            document.getElementById('btnNextPage').disabled = currentPage === totalPages;
+            paginationBar.classList.remove('hidden');
+
+            // Render view according to mode
+            if (currentViewMode === 'grid') {
+                renderGridView(pageItems);
+                gridView.classList.remove('hidden');
+                tableView.classList.add('hidden');
+                jsonView.classList.add('hidden');
+            } else if (currentViewMode === 'table') {
+                renderTableView(pageItems);
+                tableView.classList.remove('hidden');
+                gridView.classList.add('hidden');
+                jsonView.classList.add('hidden');
+            } else if (currentViewMode === 'json') {
+                renderJsonView(filteredComments);
+                jsonView.classList.remove('hidden');
+                gridView.classList.add('hidden');
+                tableView.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Render Grid Cards
+         */
+        function renderGridView(items) {
+            const gridView = document.getElementById('gridView');
+            gridView.innerHTML = items.map(item => `
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition flex flex-col justify-between shadow-sm hover:shadow-indigo-500/5 group">
+                    <div class="space-y-3">
+                        <!-- User Header -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3 min-w-0">
+                                ${item.avatar ? 
+                                    `<img src="${item.avatar}" alt="${item.author}" class="w-9 h-9 rounded-full object-cover border border-slate-700" onerror="this.onerror=null; this.src='https://placehold.co/100x100/312e81/ffffff?text=${item.author.charAt(0).toUpperCase()}';">` :
+                                    `<div class="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-white text-xs shrink-0">${item.author.charAt(0).toUpperCase()}</div>`
+                                }
+                                <div class="min-w-0">
+                                    <h4 class="text-xs font-bold text-slate-200 truncate group-hover:text-indigo-400 transition">@${escapeHtml(item.author)}</h4>
+                                    <p class="text-[11px] text-slate-400">${item.date}</p>
+                                </div>
+                            </div>
+                            <span class="text-xs text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20 flex items-center gap-1 shrink-0">
+                                <i class="fa-solid fa-heart text-[10px]"></i> ${item.likes}
+                            </span>
+                        </div>
+
+                        <!-- Comment Text Body -->
+                        <p class="text-xs sm:text-sm text-slate-300 leading-relaxed line-clamp-3 font-sans">
+                            ${escapeHtml(item.text)}
+                        </p>
+                    </div>
+
+                    <!-- Footer Action -->
+                    <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                        <button onclick="openDetailModal(${item.id})" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-expand text-[10px]"></i> Detail Lengkap
+                        </button>
+                        ${item.postUrl ? `
+                            <a href="${item.postUrl}" target="_blank" class="text-xs text-slate-400 hover:text-slate-200 transition flex items-center gap-1">
+                                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> Buka Post
+                            </a>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        /**
+         * Render Data Table View
+         */
+        function renderTableView(items) {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = items.map(item => `
+                <tr class="hover:bg-slate-800/40 transition">
+                    <td class="p-3.5 pl-4 whitespace-nowrap">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-7 h-7 rounded-full bg-indigo-600/30 text-indigo-300 flex items-center justify-center font-bold text-xs">
+                                ${item.author.charAt(0).toUpperCase()}
+                            </div>
+                            <span class="font-medium text-xs text-slate-200">@${escapeHtml(item.author)}</span>
+                        </div>
+                    </td>
+                    <td class="p-3.5 max-w-md">
+                        <p class="truncate text-xs text-slate-300">${escapeHtml(item.text)}</p>
+                    </td>
+                    <td class="p-3.5 whitespace-nowrap">
+                        <span class="text-xs text-rose-400 font-medium flex items-center gap-1">
+                            <i class="fa-solid fa-heart text-[10px]"></i> ${item.likes}
+                        </span>
+                    </td>
+                    <td class="p-3.5 whitespace-nowrap text-xs text-slate-400">
+                        ${item.date}
+                    </td>
+                    <td class="p-3.5 pr-4 text-right whitespace-nowrap">
+                        <button onclick="openDetailModal(${item.id})" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 transition text-xs">
+                            <i class="fa-solid fa-eye"></i> Detail
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        /**
+         * Render Raw JSON View
+         */
+        function renderJsonView(items) {
+            const jsonContent = document.getElementById('jsonContent');
+            const rawItems = items.map(i => i.original);
+            jsonContent.textContent = JSON.stringify(rawItems, null, 2);
+        }
+
+        /**
+         * Change View Mode (Grid, Table, JSON)
+         */
+        function setViewMode(mode) {
+            currentViewMode = mode;
+            
+            const btnGrid = document.getElementById('viewBtnGrid');
+            const btnTable = document.getElementById('viewBtnTable');
+            const btnJson = document.getElementById('viewBtnJson');
+
+            [btnGrid, btnTable, btnJson].forEach(btn => {
+                btn.className = "p-1.5 px-2.5 rounded text-xs font-medium transition text-slate-400 hover:text-slate-200";
+            });
+
+            if (mode === 'grid') {
+                btnGrid.className = "p-1.5 px-2.5 rounded text-xs font-medium transition text-indigo-400 bg-slate-800";
+            } else if (mode === 'table') {
+                btnTable.className = "p-1.5 px-2.5 rounded text-xs font-medium transition text-indigo-400 bg-slate-800";
+            } else if (mode === 'json') {
+                btnJson.className = "p-1.5 px-2.5 rounded text-xs font-medium transition text-indigo-400 bg-slate-800";
+            }
+
+            renderCurrentView();
+        }
+
+        /**
+         * Pagination Page Change
+         */
+        function changePage(direction) {
+            currentPage += direction;
+            renderCurrentView();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        /**
+         * Items Per Page Change
+         */
+        function handleItemsPerPageChange() {
+            itemsPerPage = parseInt(document.getElementById('itemsPerPage').value);
+            currentPage = 1;
+            renderCurrentView();
+        }
+
+        /**
+         * Reset Filters
+         */
+        function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('sortBy').value = 'default';
+            currentPage = 1;
+            applyFilterAndSort();
+        }
+
+        /**
+         * Open Detail Modal
+         */
+        function openDetailModal(id) {
+            const item = processedComments.find(c => c.id === id);
+            if (!item) return;
+
+            selectedItemForModal = item;
+
+            document.getElementById('modalAuthor').textContent = `@${item.author}`;
+            document.getElementById('modalDate').textContent = item.date;
+            document.getElementById('modalLikesCount').textContent = item.likes;
+            document.getElementById('modalCommentBody').textContent = item.text;
+            document.getElementById('modalRawJson').textContent = JSON.stringify(item.original, null, 2);
+
+            const avatarContainer = document.getElementById('modalAvatar');
+            if (item.avatar) {
+                avatarContainer.innerHTML = `<img src="${item.avatar}" class="w-full h-full object-cover">`;
+            } else {
+                avatarContainer.innerHTML = item.author.charAt(0).toUpperCase();
+            }
+
+            document.getElementById('detailModal').classList.remove('hidden');
+        }
+
+        /**
+         * Close Detail Modal
+         */
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+            selectedItemForModal = null;
+        }
+
+        /**
+         * Copy JSON of selected item in modal
+         */
+        function copyModalJson() {
+            if (!selectedItemForModal) return;
+            const textToCopy = JSON.stringify(selectedItemForModal.original, null, 2);
+            
+            // Clipboard fallback
+            const dummy = document.createElement("textarea");
+            document.body.appendChild(dummy);
+            dummy.value = textToCopy;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+
+            showToast("JSON Komentar berhasil disalin!", "success");
+        }
+
+        /**
+         * Export Dataset to CSV or JSON
+         */
+        function exportData(format) {
+            if (filteredComments.length === 0) {
+                showToast("Tidak ada data untuk diekspor!", "error");
+                return;
+            }
+
+            const dataToExport = filteredComments.map(c => c.original);
+
+            if (format === 'json') {
+                const jsonStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToExport, null, 2));
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute("href", jsonStr);
+                downloadAnchor.setAttribute("download", `apify_comments_export_${Date.now()}.json`);
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+                showToast("Ekspor JSON berhasil!", "success");
+            } else if (format === 'csv') {
+                // Generate CSV headers & rows
+                const headers = ["Author", "Comment_Text", "Likes", "Date"];
+                const rows = filteredComments.map(c => [
+                    `"${c.author.replace(/"/g, '""')}"`,
+                    `"${c.text.replace(/"/g, '""')}"`,
+                    c.likes,
+                    `"${c.date}"`
+                ]);
+
+                const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+                const encodedUri = encodeURI(csvContent);
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute("href", encodedUri);
+                downloadAnchor.setAttribute("download", `apify_comments_export_${Date.now()}.csv`);
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+                showToast("Ekspor CSV berhasil!", "success");
+            }
+        }
+
+        /**
+         * Utility: Escape HTML string to prevent XSS
+         */
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        /**
+         * Utility: Format Date string into readable format
+         */
+        function formatDate(dateStr) {
+            try {
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return dateStr;
+                return d.toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (e) {
+                return dateStr;
+            }
+        }
+
+        /**
+         * Utility: Show Toast Notification
+         */
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMessage.textContent = message;
+
+            if (type === 'success') {
+                toastIcon.className = "text-emerald-400";
+                toastIcon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+            } else if (type === 'error') {
+                toastIcon.className = "text-rose-400";
+                toastIcon.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i>';
+            } else {
+                toastIcon.className = "text-indigo-400";
+                toastIcon.innerHTML = '<i class="fa-solid fa-circle-info"></i>';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
